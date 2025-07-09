@@ -23,7 +23,7 @@ public class StableIdCardReader {
         if (!hcUsbSDK.USB_Init()) {
             throw new RuntimeException("USB_Init 初始化失败");
         }
-        hcUsbSDK.USB_SetLogToFile(3, "./sdkLog/", false);
+        // hcUsbSDK.USB_SetLogToFile(3, "./sdkLog/", false);
         System.out.println("[INFO] SDK初始化完成");
     }
 

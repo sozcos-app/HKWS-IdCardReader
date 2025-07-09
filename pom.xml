@@ -46,6 +46,7 @@
     </dependencies>
 
     <build>
+        <finalName>IdCardReader</finalName>  <!-- 指定最终 jar 文件名 -->
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

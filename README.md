@@ -36,6 +36,16 @@ java -jar .\target\HKWS-IdCardReader-1.0-jar-with-dependencies.jar
 ```
 
 
+# win 平台开机自启设置
+
+1. 按 Win + R 输入 shell:startup
+
+2. 将 start-idcard-reader.bat 的快捷方式放入：
+
+```text
+C:\Users\你的用户名\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
+```
+
 ---
 
 海康威视文档:
