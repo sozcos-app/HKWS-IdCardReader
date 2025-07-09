@@ -1,4 +1,7 @@
-package com.sozcos;
+package com.sozcos.utils;
+
+import com.alibaba.fastjson2.JSONObject;
+import com.sozcos.component.IdCardWebSocketHandler;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -7,8 +10,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class StableIdCardReader {
 
+    private static IdCardWebSocketHandler webSocketHandler;
+
+    public static void setWebSocketHandler(IdCardWebSocketHandler handler) {
+        webSocketHandler = handler;
+    }
+
     // 静态初始化确保USB_Init只执行一次
     private static final HCUsbSDK hcUsbSDK = HCUsbSDK.INSTANCE;
+
     static {
         if (!hcUsbSDK.USB_Init()) {
             throw new RuntimeException("USB_Init 初始化失败");
@@ -100,19 +110,21 @@ public class StableIdCardReader {
             try {
                 long now = System.currentTimeMillis();
 
-                // 冷却时间控制
                 if (now - lastReadTime < READ_COOLDOWN) {
                     Thread.sleep(POLL_INTERVAL);
                     continue;
                 }
 
-                // 带重试的读取
                 Map<String, String> idCardInfo = readWithRetry();
                 if (!idCardInfo.isEmpty()) {
                     lastReadTime = System.currentTimeMillis();
-                    printIdCardInfo(idCardInfo);
 
-                    // 成功读取后强制冷却
+                    // 通过WebSocket推送信息
+                    if (!idCardInfo.isEmpty()) {
+                        lastReadTime = System.currentTimeMillis();
+                        handleIdCardInfo(idCardInfo); // 改为回调方式
+                        Thread.sleep(1000);
+                    }
                     Thread.sleep(1000);
                 } else {
                     Thread.sleep(POLL_INTERVAL);
@@ -126,6 +138,7 @@ public class StableIdCardReader {
             }
         }
     }
+
 
     private Map<String, String> readWithRetry() {
         for (int i = 0; i < MAX_RETRY && running.get(); i++) {
@@ -142,7 +155,7 @@ public class StableIdCardReader {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                System.err.println("[WARN] 读取失败(尝试 " + (i+1) + "/" + MAX_RETRY + "): " + e.getMessage());
+                System.err.println("[WARN] 读取失败(尝试 " + (i + 1) + "/" + MAX_RETRY + "): " + e.getMessage());
             }
         }
         return new HashMap<>();
@@ -289,11 +302,12 @@ public class StableIdCardReader {
         result.put("gender", convertGenderCode(genderCode));
 
         // 民族代码 (GB/T 3304)
-        String ethnicCode = parseAsciiString(wordInfo, ETHNIC_CODE_OFFSET, ETHNIC_CODE_LENGTH);
+        String ethnicCode = parseUtf16String(wordInfo, ETHNIC_CODE_OFFSET, ETHNIC_CODE_LENGTH);
         result.put("ethnic", convertEthnicCode(ethnicCode));
 
         // 出生日期 (ASCII格式: YYYY MM DD)
-        String birthDate = parseAsciiString(wordInfo, BIRTH_DATE_OFFSET, BIRTH_DATE_LENGTH);
+        String birthDate = parseUtf16String(wordInfo, BIRTH_DATE_OFFSET, BIRTH_DATE_LENGTH);
+
         result.put("birthDate", formatDate(birthDate));
 
         // 住址 (UTF-16LE)
@@ -307,11 +321,13 @@ public class StableIdCardReader {
         result.put("issuingAuthority", parseUtf16String(wordInfo, ISSUING_AUTHORITY_OFFSET, ISSUING_AUTHORITY_LENGTH));
 
         // 有效期起始日期 (ASCII格式: YYYY MM DD)
-        String validFrom = parseAsciiString(wordInfo, VALID_FROM_OFFSET, VALID_FROM_LENGTH);
+        String validFrom = parseUtf16String(wordInfo, VALID_FROM_OFFSET, VALID_FROM_LENGTH);
+
         result.put("validFrom", formatDate(validFrom));
 
         // 有效期截止日期 (ASCII格式: YYYY MM DD)
-        String validTo = parseAsciiString(wordInfo, VALID_TO_OFFSET, VALID_TO_LENGTH);
+        String validTo = parseUtf16String(wordInfo, VALID_TO_OFFSET, VALID_TO_LENGTH);
+
         result.put("validTo", formatDate(validTo));
 
         // 设置证件类型
@@ -344,11 +360,16 @@ public class StableIdCardReader {
     private String convertGenderCode(String code) {
         // GB/T 2261.1 性别代码转换
         switch (code) {
-            case "1": return "男";
-            case "2": return "女";
-            case "0": return "未知";
-            case "9": return "未说明";
-            default: return code;
+            case "1":
+                return "男";
+            case "2":
+                return "女";
+            case "0":
+                return "未知";
+            case "9":
+                return "未说明";
+            default:
+                return code;
         }
     }
 
@@ -381,5 +402,16 @@ public class StableIdCardReader {
                 info.getOrDefault("validTo", "N/A"));
         System.out.println("读取时间: " + new java.util.Date());
         System.out.println("===========================\n");
+    }
+
+    // 供子类重写的回调方法
+    protected void handleIdCardInfo(Map<String, String> idCardInfo) {
+        printIdCardInfo(idCardInfo);
+        if (webSocketHandler != null) {
+            // 通过 websoket 推送给前端
+
+            String json = new JSONObject(idCardInfo).toString();
+            webSocketHandler.sendIdCardInfo(json);
+        }
     }
 }

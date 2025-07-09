@@ -1,12 +1,9 @@
-package com.sozcos;
+package com.sozcos.utils;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.win32.StdCallLibrary;
-
-import java.util.Arrays;
-import java.util.List;
 
 public interface HCUsbSDK extends StdCallLibrary {
 

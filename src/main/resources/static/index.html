@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>身份证 WebSocket 测试</title>
+</head>
+<body>
+<h2>身份证信息</h2>
+<pre id="output"></pre>
+
+<script>
+    const ws = new WebSocket("ws://localhost:8864/ws/idcard");
+    ws.onmessage = (event) => {
+        const info = JSON.parse(event.data);
+        document.getElementById("output").textContent = JSON.stringify(info, null, 2);
+    };
+</script>
+</body>
+</html>
